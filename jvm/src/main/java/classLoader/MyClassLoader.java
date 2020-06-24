@@ -17,7 +17,9 @@ public class MyClassLoader extends ClassLoader {
         if (name != null) {
             name = name.replaceAll("\\.", "/");
         }
-        FileInputStream fis = new FileInputStream(classPath + name + ".class");
+        String path = classPath + name + ".class";
+        System.out.println(path);
+        FileInputStream fis = new FileInputStream(path);
         int length = fis.available();
 
         byte[] bytes = new byte[length];
@@ -36,5 +38,36 @@ public class MyClassLoader extends ClassLoader {
             e.printStackTrace();
         }
         return c;
+    }
+
+    protected Class<?> loadClass(String name, boolean resolve)
+            throws ClassNotFoundException {
+        synchronized (getClassLoadingLock(name)) {
+            // First, check if the class has already been loaded
+            Class<?> c = findLoadedClass(name);
+            if (c == null) {
+                long t0 = System.nanoTime();
+                if(name.startsWith("classLoader")){//如果类全限定名称为 自定义包名
+                    c = findClass(name);
+                }else{
+                    c = this.getParent().loadClass(name);
+                }
+                if (c == null) {
+                    // If still not found, then invoke findClass in order
+                    // to find the class.
+                    long t1 = System.nanoTime();
+                    c = findClass(name);
+
+                    // this is the defining class loader; record the stats
+                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
+                    sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+                    sun.misc.PerfCounter.getFindClasses().increment();
+                }
+            }
+            if (resolve) {
+                resolveClass(c);
+            }
+            return c;
+        }
     }
 }
